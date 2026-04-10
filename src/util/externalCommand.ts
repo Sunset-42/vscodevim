@@ -60,7 +60,7 @@ class ExternalCommand {
     // preserveFocus=true keeps the editor focused so the user can keep typing
     this.outputChannel.show(true);
 
-    const output = await this.execute(command + ' 2>&1', '', cwd);
+    const output = await this.execute(command, '', cwd);
     this.outputChannel.append(output);
     if (!output.endsWith('\n')) {
       this.outputChannel.appendLine('');
@@ -75,6 +75,8 @@ class ExternalCommand {
    */
   private async execute(command: string, stdin: string, cwd?: string): Promise<string> {
     const output: string[] = [];
+    // combines stdout and stderr (compatible for all platforms)
+    command += ' 2>&1';
     const options = {
       shell: configuration.shell || undefined,
       cwd,
@@ -122,8 +124,6 @@ class ExternalCommand {
   public async run(command: string, stdin: string = '', cwd?: string): Promise<string> {
     command = this.expandCommand(command);
     this.previousExternalCommand = command;
-    // combines stdout and stderr (compatible for all platforms)
-    command += ' 2>&1';
 
     let output = await this.execute(command, stdin, cwd);
     // vim behavior, trim newlines
