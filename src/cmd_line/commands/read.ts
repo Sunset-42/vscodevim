@@ -1,8 +1,10 @@
 // eslint-disable-next-line id-denylist
 import { all, alt, optWhitespace, Parser, seq, string, whitespace } from 'parsimmon';
+import * as vscode from 'vscode';
 import { SUPPORT_READ_COMMAND } from 'platform/constants';
 import { readFileAsync } from 'platform/fs';
 import { VimState } from '../../state/vimState';
+import { externalCommand } from '../../util/externalCommand';
 import { ExCommand } from '../../vimscript/exCommand';
 import { fileNameParser, FileOpt, fileOptParser } from '../../vimscript/parserUtils';
 
@@ -59,17 +61,10 @@ export class ReadCommand extends ExCommand {
     } else if ('cmd' in this.arguments) {
       if (this.arguments.cmd.length > 0) {
         if (SUPPORT_READ_COMMAND) {
-          const cmd = this.arguments.cmd;
-          return new Promise<string>(async (resolve, reject) => {
-            const { exec } = await import('child_process');
-            exec(cmd, (err, stdout, stderr) => {
-              if (err) {
-                reject(err);
-              } else {
-                resolve(stdout);
-              }
-            });
-          });
+          const folder =
+            vscode.workspace.getWorkspaceFolder(vimState.document.uri) ??
+            vscode.workspace.workspaceFolders?.[0];
+          return externalCommand.run(this.arguments.cmd, '', folder?.uri.fsPath);
         } else {
           return '';
         }
