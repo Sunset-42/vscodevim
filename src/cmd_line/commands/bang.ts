@@ -44,7 +44,7 @@ export class BangCommand extends ExCommand {
     const folder =
       vscode.workspace.getWorkspaceFolder(vimState.document.uri) ??
       vscode.workspace.workspaceFolders?.[0];
-    externalCommand.runInTerminal(this._arguments.command, folder?.uri);
+    await externalCommand.runInOutput(this._arguments.command, folder?.uri.fsPath);
   }
 
   override async executeWithRange(vimState: VimState, range: LineRange): Promise<void> {

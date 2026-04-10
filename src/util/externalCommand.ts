@@ -4,6 +4,14 @@ import { VimError } from '../error';
 
 class ExternalCommand {
   private previousExternalCommand: string | undefined;
+  private _outputChannel: vscode.OutputChannel | undefined;
+
+  private get outputChannel(): vscode.OutputChannel {
+    if (!this._outputChannel) {
+      this._outputChannel = vscode.window.createOutputChannel('vim terminal');
+    }
+    return this._outputChannel;
+  }
 
   /**
    * Expands the given command by replacing any '!' with the previous external
@@ -37,24 +45,26 @@ class ExternalCommand {
   }
 
   /**
-   * Runs the given command in a VS Code terminal, creating or reusing a
-   * terminal named 'vscodevim'. The terminal is shown without stealing focus
-   * from the editor.
+   * Runs the given command as a background process and shows the command and
+   * its output in the "vim terminal" Output Channel. The channel is revealed
+   * without stealing focus from the editor.
    *
    * @param command the command to run
-   * @param cwd working directory for a newly created terminal
+   * @param cwd working directory for the child process
    */
-  public runInTerminal(command: string, cwd?: string | vscode.Uri): void {
+  public async runInOutput(command: string, cwd?: string): Promise<void> {
     command = this.expandCommand(command);
     this.previousExternalCommand = command;
 
-    const existing = vscode.window.terminals.find(
-      (t) => t.name === 'vscodevim' && t.exitStatus === undefined,
-    );
-    const terminal = existing ?? vscode.window.createTerminal({ name: 'vscodevim', cwd });
+    this.outputChannel.appendLine(`$ ${command}`);
     // preserveFocus=true keeps the editor focused so the user can keep typing
-    terminal.show(true);
-    terminal.sendText(command);
+    this.outputChannel.show(true);
+
+    const output = await this.execute(command + ' 2>&1', '', cwd);
+    this.outputChannel.append(output);
+    if (!output.endsWith('\n')) {
+      this.outputChannel.appendLine('');
+    }
   }
 
   /**
