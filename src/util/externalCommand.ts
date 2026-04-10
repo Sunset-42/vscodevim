@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import { configuration } from '../configuration/configuration';
 import { VimError } from '../error';
 
@@ -36,14 +37,37 @@ class ExternalCommand {
   }
 
   /**
+   * Runs the given command in a VS Code terminal, creating or reusing a
+   * terminal named 'vscodevim'. The terminal is shown without stealing focus
+   * from the editor.
+   *
+   * @param command the command to run
+   * @param cwd working directory for a newly created terminal
+   */
+  public runInTerminal(command: string, cwd?: string | vscode.Uri): void {
+    command = this.expandCommand(command);
+    this.previousExternalCommand = command;
+
+    const existing = vscode.window.terminals.find(
+      (t) => t.name === 'vscodevim' && t.exitStatus === undefined,
+    );
+    const terminal = existing ?? vscode.window.createTerminal({ name: 'vscodevim', cwd });
+    // preserveFocus=true keeps the editor focused so the user can keep typing
+    terminal.show(true);
+    terminal.sendText(command);
+  }
+
+  /**
    * Executes `command` and returns the output.
    * @param command the command to run
    * @param stdin string to pipe into stdin
+   * @param cwd working directory for the child process
    */
-  private async execute(command: string, stdin: string): Promise<string> {
+  private async execute(command: string, stdin: string, cwd?: string): Promise<string> {
     const output: string[] = [];
     const options = {
       shell: configuration.shell || undefined,
+      cwd,
     };
 
     try {
@@ -83,14 +107,15 @@ class ExternalCommand {
    *
    * @param command the command to run
    * @param stdin string to pipe into stdin, by default the empty string
+   * @param cwd working directory for the child process
    */
-  public async run(command: string, stdin: string = ''): Promise<string> {
+  public async run(command: string, stdin: string = '', cwd?: string): Promise<string> {
     command = this.expandCommand(command);
     this.previousExternalCommand = command;
     // combines stdout and stderr (compatible for all platforms)
     command += ' 2>&1';
 
-    let output = await this.execute(command, stdin);
+    let output = await this.execute(command, stdin, cwd);
     // vim behavior, trim newlines
     if (output.endsWith('\r\n')) {
       output = output.slice(0, -2);
