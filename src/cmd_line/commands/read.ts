@@ -1,8 +1,8 @@
 // eslint-disable-next-line id-denylist
 import { all, alt, optWhitespace, Parser, seq, string, whitespace } from 'parsimmon';
-import * as vscode from 'vscode';
+import * as path from 'path';
 import { SUPPORT_READ_COMMAND } from 'platform/constants';
-import { readFileAsync } from 'platform/fs';
+import * as vscode from 'vscode';
 import { VimState } from '../../state/vimState';
 import { externalCommand } from '../../util/externalCommand';
 import { ExCommand } from '../../vimscript/exCommand';
@@ -55,9 +55,29 @@ export class ReadCommand extends ExCommand {
 
   // TODO: executeWithRange()
 
+  async getFileContent(vimState: VimState, fileName: string): Promise<string> {
+    let baseDir: vscode.Uri | undefined;
+
+    if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
+      baseDir = vscode.workspace.workspaceFolders[0].uri;
+    } else {
+      baseDir = vscode.Uri.file(path.dirname(vimState.document.uri.fsPath));
+    }
+
+    const filePath = vscode.Uri.joinPath(baseDir, fileName);
+
+    try {
+      const fileData = await vscode.workspace.fs.readFile(filePath);
+      return Buffer.from(fileData).toString('utf8');
+    } catch (error) {
+      console.error(`Failed to read file: ${filePath.toString()}`, error);
+      return ''; // Return empty string on error
+    }
+  }
+
   async getTextToInsert(vimState: VimState): Promise<string> {
     if ('file' in this.arguments) {
-      return readFileAsync(this.arguments.file, 'utf8');
+      return this.getFileContent(vimState, this.arguments.file);
     } else if ('cmd' in this.arguments) {
       if (this.arguments.cmd.length > 0) {
         if (SUPPORT_READ_COMMAND) {
