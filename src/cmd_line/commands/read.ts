@@ -1,5 +1,6 @@
 // eslint-disable-next-line id-denylist
 import { all, alt, optWhitespace, Parser, seq, string, whitespace } from 'parsimmon';
+import * as os from 'os';
 import * as path from 'path';
 import { SUPPORT_READ_COMMAND } from 'platform/constants';
 import * as vscode from 'vscode';
@@ -61,8 +62,13 @@ export class ReadCommand extends ExCommand {
 
     if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
       baseDir = vscode.workspace.workspaceFolders[0].uri;
-    } else {
+    } else if (vimState.document.uri.scheme === 'file') {
       baseDir = vscode.Uri.file(path.dirname(vimState.document.uri.fsPath));
+    } else {
+      // Virtual/untitled documents have no real file path; fall back to the home directory.
+      // os.homedir() runs on the extension host, so it returns the remote home directory
+      // when connected to a remote environment.
+      baseDir = vscode.Uri.file(os.homedir());
     }
 
     const filePath = vscode.Uri.joinPath(baseDir, fileName);
