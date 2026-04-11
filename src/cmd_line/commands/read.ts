@@ -71,7 +71,7 @@ export class ReadCommand extends ExCommand {
         // vscode.env nor vscode.workspace exposes the remote home directory. Therefore ~
         // cannot be expanded when connected to a remote — use an absolute remote path instead.
         Logger.error(
-          ':read ~/ is not supported in remote sessions: VS Code provides no API for the remote home directory',
+          ':read ~ is not supported in remote sessions: VS Code provides no API for the remote home directory',
         );
         return '';
       }
