@@ -1,9 +1,9 @@
 // eslint-disable-next-line id-denylist
 import { all, alt, optWhitespace, Parser, seq, string, whitespace } from 'parsimmon';
-import * as os from 'os';
 import * as path from 'path';
 import { SUPPORT_READ_COMMAND } from 'platform/constants';
 import * as vscode from 'vscode';
+import { Globals } from '../../globals';
 import { VimState } from '../../state/vimState';
 import { externalCommand } from '../../util/externalCommand';
 import { Logger } from '../../util/logger';
@@ -66,9 +66,19 @@ export class ReadCommand extends ExCommand {
       baseDir = vscode.Uri.file(path.dirname(vimState.document.uri.fsPath));
     } else {
       // Virtual/untitled documents have no real file path; fall back to the home directory.
-      // os.homedir() runs on the extension host, so it returns the remote home directory
-      // when connected to a remote environment.
-      baseDir = vscode.Uri.file(os.homedir());
+      // We obtain the home path from the process environment (which on a remote extension host
+      // reflects the *remote* machine's environment) and construct the URI by re-using the
+      // scheme and authority of the VS Code-provided globalStorageUri so that the resulting URI
+      // is valid for the current environment (local, SSH remote, Codespaces, etc.).
+      const homePath = process.env.HOME ?? process.env.USERPROFILE;
+      if (homePath && Globals.extensionStorageUri) {
+        baseDir = Globals.extensionStorageUri.with({ path: homePath });
+      }
+    }
+
+    if (baseDir === undefined) {
+      Logger.error('Unable to determine base directory for :read command');
+      return '';
     }
 
     const filePath = vscode.Uri.joinPath(baseDir, fileName);

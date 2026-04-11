@@ -33,6 +33,7 @@ export { getAndUpdateModeHandler } from './extensionBase';
 export async function activate(context: vscode.ExtensionContext) {
   // Set the storage path to be used by history files
   Globals.extensionStoragePath = context.globalStorageUri.fsPath;
+  Globals.extensionStorageUri = context.globalStorageUri;
 
   await activateFunc(context);
 
