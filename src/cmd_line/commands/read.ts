@@ -5,6 +5,7 @@ import { SUPPORT_READ_COMMAND } from 'platform/constants';
 import * as vscode from 'vscode';
 import { VimState } from '../../state/vimState';
 import { externalCommand } from '../../util/externalCommand';
+import { Logger } from '../../util/logger';
 import { ExCommand } from '../../vimscript/exCommand';
 import { fileNameParser, FileOpt, fileOptParser } from '../../vimscript/parserUtils';
 
@@ -67,10 +68,23 @@ export class ReadCommand extends ExCommand {
     const filePath = vscode.Uri.joinPath(baseDir, fileName);
 
     try {
+      // Check if the file exists before attempting to read
+      const fileExists = await vscode.workspace.fs.stat(filePath).then(
+        () => true,
+        () => false,
+      );
+
+      if (!fileExists) {
+        Logger.error(`File does not exist: ${filePath.toString()}`);
+        return ''; // Return empty string if file does not exist
+      }
+
+      // Read the file content
       const fileData = await vscode.workspace.fs.readFile(filePath);
       return Buffer.from(fileData).toString('utf8');
     } catch (error) {
-      console.error(`Failed to read file: ${filePath.toString()}`, error);
+      const err = error instanceof Error ? error.message : String(error);
+      Logger.error(`Failed to read file: ${filePath.toString()}. err=${err}.`);
       return ''; // Return empty string on error
     }
   }
