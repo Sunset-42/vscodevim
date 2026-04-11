@@ -134,8 +134,13 @@ export function getPathDetails(
   const updatedPartialPath = partialPath;
 
   if (currentUri.scheme === 'file' || (currentUri.scheme === 'untitled' && !isRemote)) {
-    // We can untildify when the scheme is 'file' or 'untitled' on local fs because
-    // because we only support opening files mounted locally.
+    // Tilde expansion is only possible for local paths. VS Code provides no public API to
+    // query the remote machine's $HOME: vscode.env.remoteName only tells us that a remote
+    // connection exists; neither vscode.env nor vscode.workspace exposes the remote home
+    // directory. The extension always runs in the local extension host ("extensionKind":
+    // ["ui"]), so os.homedir() / process.env.HOME reflect the *local* machine. For remote
+    // URIs (e.g. vscode-remote://ssh-remote+host/...) the ~ character is therefore left
+    // unexpanded — use an absolute remote path instead.
     partialPath = untildify(partialPath);
   }
 

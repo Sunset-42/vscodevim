@@ -1,5 +1,5 @@
-// eslint-disable-next-line id-denylist
-import { all, alt, optWhitespace, Parser, seq, string, whitespace } from 'parsimmon';
+import * as os from 'os';
+import { all, alt, optWhitespace, Parser, seq, string, whitespace } from 'parsimmon'; // eslint-disable-line id-denylist
 import * as path from 'path';
 import { SUPPORT_READ_COMMAND } from 'platform/constants';
 import * as vscode from 'vscode';
@@ -8,6 +8,8 @@ import { externalCommand } from '../../util/externalCommand';
 import { Logger } from '../../util/logger';
 import { ExCommand } from '../../vimscript/exCommand';
 import { fileNameParser, FileOpt, fileOptParser } from '../../vimscript/parserUtils';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+import untildify = require('untildify');
 
 export type IReadCommandArguments =
   | { opt: FileOpt; cmd: string }
@@ -57,24 +59,39 @@ export class ReadCommand extends ExCommand {
   // TODO: executeWithRange()
 
   async getFileContent(vimState: VimState, fileName: string): Promise<string> {
-    let baseDir: vscode.Uri | undefined;
+    const isRemote = !!vscode.env.remoteName;
+
+    // Tilde (~) expansion: `~/path` refers to the user's home directory.
+    if (fileName.startsWith('~/') || fileName === '~') {
+      if (isRemote) {
+        // VS Code provides no public API to query the remote machine's $HOME.
+        // The extension always runs in the local extension host ("extensionKind": ["ui"]),
+        // so os.homedir() / process.env.HOME reflect the *local* machine, not the remote.
+        // vscode.env.remoteName only tells us that a remote connection exists; neither
+        // vscode.env nor vscode.workspace exposes the remote home directory. Therefore ~
+        // cannot be expanded when connected to a remote — use an absolute remote path instead.
+        Logger.error(
+          ':read ~/ is not supported in remote sessions: VS Code provides no API for the remote home directory',
+        );
+        return '';
+      }
+      // Local: expand ~ to the actual home directory so that joinPath below treats
+      // the result as an absolute path.
+      fileName = untildify(fileName);
+    }
+
+    let baseDir: vscode.Uri;
 
     if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
       baseDir = vscode.workspace.workspaceFolders[0].uri;
     } else if (vimState.document.uri.scheme === 'file') {
       baseDir = vscode.Uri.file(path.dirname(vimState.document.uri.fsPath));
     } else {
-      // Virtual/untitled documents have no real file path and there is no workspace folder,
-      // so we cannot determine the base directory. VSCodeVim is a UI extension
-      // ("extensionKind": ["ui"]) and always runs in the local extension host — even when
-      // connected to a remote. Node APIs such as os.homedir() and process.env.HOME therefore
-      // return local-machine values, not remote-machine values, making them unsuitable as a
-      // fallback. Leave baseDir undefined so the guard below returns an error.
-    }
-
-    if (baseDir === undefined) {
-      Logger.error('Unable to determine base directory for :read command');
-      return '';
+      // Untitled document with no workspace folder open: fall back to the local home directory.
+      // If connected to a remote this still uses the *local* home because the extension runs in
+      // the local extension host — VS Code provides no API to determine the remote $HOME
+      // (see the tilde-expansion comment above).
+      baseDir = vscode.Uri.file(os.homedir());
     }
 
     const filePath = vscode.Uri.joinPath(baseDir, fileName);
