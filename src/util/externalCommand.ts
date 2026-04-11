@@ -1,17 +1,8 @@
-import * as vscode from 'vscode';
 import { configuration } from '../configuration/configuration';
 import { VimError } from '../error';
 
 class ExternalCommand {
   private previousExternalCommand: string | undefined;
-  private _outputChannel: vscode.OutputChannel | undefined;
-
-  private get outputChannel(): vscode.OutputChannel {
-    if (!this._outputChannel) {
-      this._outputChannel = vscode.window.createOutputChannel('vim terminal');
-    }
-    return this._outputChannel;
-  }
 
   /**
    * Expands the given command by replacing any '!' with the previous external
@@ -45,41 +36,14 @@ class ExternalCommand {
   }
 
   /**
-   * Runs the given command as a background process and shows the command and
-   * its output in the "vim terminal" Output Channel. The channel is revealed
-   * without stealing focus from the editor.
-   *
-   * @param command the command to run
-   * @param cwd working directory for the child process
-   */
-  public async runInOutput(command: string, cwd?: string): Promise<void> {
-    command = this.expandCommand(command);
-    this.previousExternalCommand = command;
-
-    this.outputChannel.appendLine(`$ ${command}`);
-    // preserveFocus=true keeps the editor focused so the user can keep typing
-    this.outputChannel.show(true);
-
-    const output = await this.execute(command, '', cwd);
-    this.outputChannel.append(output);
-    if (!output.endsWith('\n')) {
-      this.outputChannel.appendLine('');
-    }
-  }
-
-  /**
    * Executes `command` and returns the output.
    * @param command the command to run
    * @param stdin string to pipe into stdin
-   * @param cwd working directory for the child process
    */
-  private async execute(command: string, stdin: string, cwd?: string): Promise<string> {
+  private async execute(command: string, stdin: string): Promise<string> {
     const output: string[] = [];
-    // combines stdout and stderr (compatible for all platforms)
-    command += ' 2>&1';
     const options = {
       shell: configuration.shell || undefined,
-      cwd,
     };
 
     try {
@@ -119,13 +83,14 @@ class ExternalCommand {
    *
    * @param command the command to run
    * @param stdin string to pipe into stdin, by default the empty string
-   * @param cwd working directory for the child process
    */
-  public async run(command: string, stdin: string = '', cwd?: string): Promise<string> {
+  public async run(command: string, stdin: string = ''): Promise<string> {
     command = this.expandCommand(command);
     this.previousExternalCommand = command;
+    // combines stdout and stderr (compatible for all platforms)
+    command += ' 2>&1';
 
-    let output = await this.execute(command, stdin, cwd);
+    let output = await this.execute(command, stdin);
     // vim behavior, trim newlines
     if (output.endsWith('\r\n')) {
       output = output.slice(0, -2);

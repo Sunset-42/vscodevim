@@ -1,5 +1,4 @@
 import { all, Parser } from 'parsimmon';
-import * as vscode from 'vscode';
 import { PositionDiff } from '../../common/motion/position';
 import { VimState } from '../../state/vimState';
 import { externalCommand } from '../../util/externalCommand';
@@ -41,10 +40,7 @@ export class BangCommand extends ExCommand {
   }
 
   async execute(vimState: VimState): Promise<void> {
-    const folder =
-      vscode.workspace.getWorkspaceFolder(vimState.document.uri) ??
-      vscode.workspace.workspaceFolders?.[0];
-    await externalCommand.runInOutput(this._arguments.command, folder?.uri.fsPath);
+    await externalCommand.run(this._arguments.command);
   }
 
   override async executeWithRange(vimState: VimState, range: LineRange): Promise<void> {
@@ -52,10 +48,7 @@ export class BangCommand extends ExCommand {
 
     // pipe in stdin from lines in range
     const input = vimState.document.getText(resolvedRange);
-    const folder =
-      vscode.workspace.getWorkspaceFolder(vimState.document.uri) ??
-      vscode.workspace.workspaceFolders?.[0];
-    const output = await externalCommand.run(this._arguments.command, input, folder?.uri.fsPath);
+    const output = await externalCommand.run(this._arguments.command, input);
 
     // place cursor at the start of the replaced text and first non-whitespace character
     const diff = this.getReplaceDiff(output);
