@@ -3,7 +3,6 @@ import { all, alt, optWhitespace, Parser, seq, string, whitespace } from 'parsim
 import * as path from 'path';
 import { SUPPORT_READ_COMMAND } from 'platform/constants';
 import * as vscode from 'vscode';
-import { Globals } from '../../globals';
 import { VimState } from '../../state/vimState';
 import { externalCommand } from '../../util/externalCommand';
 import { Logger } from '../../util/logger';
@@ -65,15 +64,12 @@ export class ReadCommand extends ExCommand {
     } else if (vimState.document.uri.scheme === 'file') {
       baseDir = vscode.Uri.file(path.dirname(vimState.document.uri.fsPath));
     } else {
-      // Virtual/untitled documents have no real file path; fall back to the home directory.
-      // We obtain the home path from the process environment (which on a remote extension host
-      // reflects the *remote* machine's environment) and construct the URI by re-using the
-      // scheme and authority of the VS Code-provided globalStorageUri so that the resulting URI
-      // is valid for the current environment (local, SSH remote, Codespaces, etc.).
-      const homePath = process.env.HOME ?? process.env.USERPROFILE;
-      if (homePath && Globals.extensionStorageUri) {
-        baseDir = Globals.extensionStorageUri.with({ path: homePath });
-      }
+      // Virtual/untitled documents have no real file path and there is no workspace folder,
+      // so we cannot determine the base directory. VSCodeVim is a UI extension
+      // ("extensionKind": ["ui"]) and always runs in the local extension host — even when
+      // connected to a remote. Node APIs such as os.homedir() and process.env.HOME therefore
+      // return local-machine values, not remote-machine values, making them unsuitable as a
+      // fallback. Leave baseDir undefined so the guard below returns an error.
     }
 
     if (baseDir === undefined) {
